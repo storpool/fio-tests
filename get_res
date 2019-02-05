@@ -1,0 +1,198 @@
+#!/usr/bin/perl
+
+use 5.010;
+use strict;
+use warnings;
+use autodie;
+use Data::Dumper;
+use JSON::XS;
+use POSIX qw(strftime);
+
+#  read : io=3387.1MB, bw=346887KB/s, iops=86721, runt= 10001msec
+
+sub dehuman($)
+{
+	my ($human) = @_;
+
+	my %suff = (
+		'' => 1,
+		k => 1024,
+		m => 1024*1024,
+		g => 1024*1024*1024,
+	);
+
+	my ($value, $suffix) = $human =~ m/^(\d+)([a-zA-Z]?)$/;
+	die "not a value $human" unless defined $value;
+
+	return $value * $suff{lc $suffix};
+}
+
+my %fio = map {
+	/^
+		SP_FIO_
+		(?<var> [A-Z_]+ )
+		=
+		(?<value> .* )
+	/x
+		? (lc $+{var} => $+{value})
+		: ()
+} split /[\r\n]+/, qx(env SP_FIO_DETECT_PRINT=1 ./fio-detect);
+if( !defined $fio{ext} )
+{
+	die "Could not determine the fio files extension\n";
+}
+my $fio_ext = $fio{ext};
+
+my @res = grep
+		{ m/^res\/\w+-\w+-\w+-\w+(-\d+)?\.fio\.\Q$fio_ext\E$/ }
+		<res/*.fio.*>
+	;
+
+my $json = JSON::XS->new->canonical->utf8->pretty;
+
+sub parse_fio_2_log($ $)
+{
+	my ($res, $short, $contents) = @_;
+	my $iops = 0;
+	my $latency;
+	
+	for my $line (split /[\r\n]+/, $contents)
+	{
+		chomp $line;
+		if ($line =~ m/^  read :|^  write:/ )
+		{
+			#  read : io=3387.1MB, bw=346887KB/s, iops=86721, runt= 10001msec
+			#say $line;
+			my ($temp) = $line =~ m/ iops=(\d+) ?,/;
+			die "did not find iops on line $line" unless defined $temp;
+
+			$iops += $temp;
+		}
+		elsif ($line =~ m/\s+lat \((?<prefix>[mu])sec\): .+, avg= *(?<val>[0-9.]+),/)
+		{
+			#  lat (usec): min=25, max=1629, avg= 9.61, stdev=78.12
+			# say "detected: $line";
+			my ($prefix, $val) = ($+{prefix}, $+{val});
+			if ($prefix eq 'm') {
+				$latency = $val * 1000;
+			} else {
+				$latency = $val;
+			}
+		}
+
+
+
+	}
+
+	return ($iops, $latency);
+}
+
+sub parse_fio_3_json($ $)
+{
+	my ($res, $short, $contents) = @_;
+	my $iops = 0 ;
+	my $latency = 0;
+
+	my $j = eval {
+		$json->decode($contents)
+	};
+	if ($@) {
+		my $msg = $@;
+		$msg =~ s/[\r\n]*$//;
+		die "Could not decode the JSON contents of '$res': $msg\n";
+	}
+	if( !defined $j->{jobs} || ref($j->{jobs}) ne 'ARRAY' || !defined $j->{jobs}[0] )
+	{
+		die "Invalid JSON data in '$res': no jobs defined\n";
+	}
+	my $job = $j->{jobs}[0];
+	if( $job->{jobname} ne $short )
+	{
+		die "Invalid JSON data in '$res': expected job '$short', got '$job->{jobname}'\n";
+	}
+	my %found = (
+		dir => {},
+	);
+	for my $dir (qw(read write))
+	{
+		my $data = $job->{$dir};
+		next unless defined $data;
+
+		if( !defined $data->{iops} )
+		{
+			die "No $dir iops data in '$res'\n";
+		} elsif( !defined $data->{lat_ns} || ref $data->{lat_ns} ne 'HASH' || !defined $data->{lat_ns}{mean} )
+		{
+			die "No $dir latency data in '$res'\n";
+		}
+
+		$iops += $data->{iops};
+		my $nlat = $data->{lat_ns}{mean} / 1000.0;
+		$latency = $nlat if $nlat > $latency;
+	}
+
+	return ($iops, $latency);
+}
+
+my %handlers = (
+	log => \&parse_fio_2_log,
+	json => \&parse_fio_3_json,
+);
+
+for my $res (sort @res)
+{
+	#res/rand-r-4k-32.fio.json
+	my ($short, $type, $dir, $bs, $qd, $iopslimit) = $res =~ m{
+		^ res/
+		(?<short>
+			(?<type> \w+ ) -
+			(?<dir> \w+ ) -
+			(?<bs> \w+ ) -
+			(?<qd> \w+ )
+			(?:
+				- (?<limit> \d+ )
+			)?
+		)
+		\.fio\.\Q$fio_ext\E $}x;
+	next unless defined $type;
+
+	my ($mtime) = strftime( "%F %T",gmtime ((stat($res))[9]) );
+
+	my $contents;
+	open my $f, '<', $res;
+	{
+		local $/;
+		$contents = <$f>;
+	}
+	close $f;
+
+	my ($iops, $latency) = $handlers{$fio_ext}->($res, $short, $contents);
+
+	my ($value, $unit);
+	if ($type eq 'seq')
+	{
+		$unit = 'MB/s';
+		$value = sprintf '%.0f', dehuman($bs)*$iops/1024/1024;
+	}
+	elsif ($type eq 'rand')
+	{
+		$unit = 'IOPS';
+		$value = sprintf '%.0f', $iops;
+	}
+	elsif ($type eq 'lat')
+	{
+		$unit = 'ms';
+		$value = sprintf '%.3f', $latency/1000;
+	}
+	elsif ($type eq 'latpio')
+	{
+		$unit = 'ms;IOPS';
+		$value = sprintf '%.3f;%.0f', $latency/1000, $iops ;
+	}
+	else
+	{
+		die "unknown type $type";
+	}
+
+	say join ',', $short, $mtime, $value, $unit;
+}

@@ -1,0 +1,11 @@
+#!/usr/bin/awk -f
+
+BEGIN {
+        FS=","
+        format = "%-15s %-7s %-4s\n"
+        printf format, "name", "result", "unit"
+        printf format, "----", "------", "----"
+}
+{
+        printf format, $1, $3, $4
+}

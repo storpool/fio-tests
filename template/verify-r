@@ -1,0 +1,16 @@
+[rand-w-32k-32-verify]
+ioengine=libaio
+direct=1
+
+randrepeat=0
+rw=randwrite
+bs=32k
+iodepth=32
+
+verify=crc32c-intel
+write_iops_log=verify-r
+verify_fatal=1
+verify_dump=1
+
+log_avg_msec=1000
+size=1G

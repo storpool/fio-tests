@@ -1,0 +1,16 @@
+[seq-w-1M-32-verify]
+ioengine=libaio
+direct=1
+
+rw=write
+bs=1M
+iodepth=32
+
+
+verify=crc32c-intel
+write_bw_log=verify-s
+verify_fatal=1
+verify_dump=1
+
+log_avg_msec=1000
+size=8G

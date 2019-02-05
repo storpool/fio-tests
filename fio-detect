@@ -1,0 +1,80 @@
+#!/bin/sh
+#
+#-
+# Copyright (c) 2018  StorPool.
+# All rights reserved.
+#
+# This file is meant to be either sourced by a shell script or executed
+# with the SP_FIO_DETECT_PRINT environment variable set to a true value
+# (1, y, Yes, T, true, etc).
+#
+# If sourcing it from a shell script, the SP_FIO_DETECT_PRINT variable
+# MUST be either unset or set to a non-true value!  In that case,
+# the SP_FIO_MAJOR, SP_FIO_EXT, and SP_FIO_PARAMS variables will be
+# defined and exported in the environment.
+
+fio_detect()
+{
+	local ver
+
+	if [ -z "$SP_FIO_MAJOR" ]; then
+		ver="$(fio --version | cut -d- -f2 | cut -d. -f1)"
+		case "$ver" in
+			2|3)
+				export SP_FIO_MAJOR="$ver"
+				;;
+			
+			*)
+				echo "Could not determine the fio tool's version\n" 1>&2
+				exit 1
+				;;
+		esac
+	fi
+
+	if [ -z "$SP_FIO_EXT" ]; then
+		case "$SP_FIO_MAJOR" in
+			2)
+				export SP_FIO_EXT='log'
+				;;
+			
+			3)
+				export SP_FIO_EXT='json'
+				;;
+			
+			*)
+				echo "Invalid SP_FIO_MAJOR value '$SP_FIO_MAJOR'" 1>&2
+				exit 1
+				;;
+		esac
+	fi
+
+	if [ -z "$SP_FIO_PARAMS" ]; then
+		case "$SP_FIO_MAJOR" in
+			2)
+				export SP_FIO_PARAMS=''
+				;;
+			
+			3)
+				export SP_FIO_PARAMS='--output-format=json+'
+				;;
+			
+			*)
+				echo "Invalid SP_FIO_MAJOR value '$SP_FIO_MAJOR'" 1>&2
+				exit 1
+				;;
+		esac
+	fi
+}
+
+fio_detect
+
+case "$SP_FIO_DETECT_PRINT" in
+	[1-9]*|T*|t*|Y*|y*)
+		echo "SP_FIO_MAJOR=$SP_FIO_MAJOR"
+		echo "SP_FIO_EXT=$SP_FIO_EXT"
+		echo "SP_FIO_PARAMS=$SP_FIO_PARAMS"
+		;;
+		
+	*)
+		;;
+esac

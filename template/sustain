@@ -1,0 +1,16 @@
+[sustain]
+ioengine=libaio
+direct=1
+time_based
+norandommap
+randrepeat=0
+
+rw=randwrite
+bs=4k
+iodepth=32
+
+runtime=2h
+
+write_iops_log=sustain_4k_iops
+write_lat_log=sustain_4k_lat
+log_avg_msec=100

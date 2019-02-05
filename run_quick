@@ -1,0 +1,125 @@
+#!/bin/bash
+set -e
+
+usage(){
+	cat <<EOUSAGE
+	Usage: $(basename -- $0) [-a] [-t=<template>] [-h|--help]
+	Usage: $(basename -- $0) <block_device>
+
+	Installs perl and fio dependencies, then runs a set of tests on <block_device>
+	Check the ./template directory for more fio example tests.
+
+	[-h] - prints this help message.
+
+	[-a] - attemtps to automatically create a volume with hybrid
+	placement (placeAll hdd placeTail ssd). Cleans up the volume afterwards.
+
+	[-t=<template>] - use template <template> instead, implies '-a'
+
+EOUSAGE
+}
+
+
+if [ -n "$*" ]; then
+	while test -n "$1"; do
+		case "$1" in
+			-h|--help)
+				usage
+				exit
+				;;
+			-a)
+				autof=1
+				shift
+				;;
+			-t=*)
+				template=${1##*=}
+				echo "using template $template"
+				shift
+				;;
+			/dev/*)
+				tvolume="$1"
+				shift
+				;;
+			*)
+				usage
+				exit 1
+				;;
+		esac
+	done
+else
+	usage
+	exit 1
+fi
+
+cleanup(){
+	if [[ -n "$autof" ]]; then
+		echo "Cleaning up $tname"
+		storpool detach volume "$tname" here
+		storpool volume "$tname" delete "$tname"
+		echo "Cleanup successful"
+	fi
+}
+
+chkdepend(){
+	local fio="$(which fio)"
+	if [[ ! -e $fio ]]; then
+		echo "Attempting to installing fio,perl dependencies"
+		if type -f yum 2>/dev/null; then
+			yum -y install epel-release perl-core
+			yum -y install perl-JSON-XS fio
+		elif type -f apt-get 2>/dev/null; then
+			apt-get --yes install perl libdata-dump-perl libjson-xs-perl fio
+		else
+			echo 'Neither apt-get, nor yum found, OS not supported?' 1>&2
+			exit 1
+		fi
+	fi
+}
+
+if [[ -n "$autof" ]]; then
+	if [[ -n $tvolume ]]; then
+		echo "Error: '-a' creates volume automatically, please remove it if you'd like to test on $tvolume" 1>&2
+		exit 1
+	fi
+	trap 'cleanup' EXIT INT QUIT TERM
+	echo 'Attempting to create hybrid test volume'
+	tname="test$$"
+	tvolume="/dev/storpool/$tname"
+	if [[ -z $template ]]; then
+		storpool volume "$tname" size 100G replication 3 placeAll hdd placeTail ssd
+	else
+		storpool volume "$tname" size 100G template "$template"
+	fi
+	storpool attach volume "$tname" here
+fi
+
+if [[ ! -b $tvolume ]]; then
+	echo "$tvolume is not a block device, exiting"
+	exit 1
+fi
+
+chkdepend
+
+echo Regenerating templates
+	cd template
+	./rm_templates
+	./gen.pl
+	cd ..
+	tests=( $(cat ./tests ) )
+
+echo Cleaning results directory
+	./rm_res
+
+# Use fio-detect here to set the variables so that we don't
+# have to run `fio --version` for each test in run_one.
+unset SP_FIO_DETECT_PRINT
+. ./fio-detect
+
+echo Running tests...
+	for test in ${tests[*]}; do
+		./run_one "$test" "$tvolume"
+	done
+
+echo Displaying and saving result...
+	./get_res | sort | ./pretty_print
+	./get_res | sort >results.txt
