@@ -1,6 +1,8 @@
 [trim]
 ioengine=libaio
 direct=1
+clocksource=cpu
+gtod_reduce=1
 
 iodepth=32
 bs=1M

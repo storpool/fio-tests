@@ -1,6 +1,8 @@
 [rand-w-32k-32-verify]
 ioengine=libaio
 direct=1
+clocksource=cpu
+gtod_reduce=1
 
 randrepeat=0
 rw=randwrite

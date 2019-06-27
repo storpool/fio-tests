@@ -104,6 +104,8 @@ sub gen_normal($)
 ioengine=libaio
 direct=1
 sync=0
+clocksource=cpu
+gtod_reduce=1
 time_based
 ".
 ( ($type eq 'lat' or $type eq 'rand' ) ? "norandommap\nrandrepeat=0\n" : "" ).

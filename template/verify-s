@@ -1,6 +1,8 @@
 [seq-w-1M-32-verify]
 ioengine=libaio
 direct=1
+clocksource=cpu
+gtod_reduce=1
 
 rw=write
 bs=1M

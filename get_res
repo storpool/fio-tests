@@ -182,12 +182,12 @@ for my $res (sort @res)
 	elsif ($type eq 'lat')
 	{
 		$unit = 'ms';
-		$value = sprintf '%.3f', $latency/1000;
+		$value = sprintf '%.3f', 1000/$iops;
 	}
 	elsif ($type eq 'latpio')
 	{
 		$unit = 'ms;IOPS';
-		$value = sprintf '%.3f;%.0f', $latency/1000, $iops ;
+		$value = sprintf '%.3f;%.0f', 1000/$iops, $iops ;
 	}
 	else
 	{
