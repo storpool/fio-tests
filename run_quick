@@ -121,5 +121,6 @@ echo Running tests...
 	done
 
 echo Displaying and saving result...
+	sed -i.bak '/{/,$!d' res/*.json
 	./get_res | sort | ./pretty_print
 	./get_res | sort >results.txt
