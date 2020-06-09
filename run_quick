@@ -16,9 +16,13 @@ usage(){
 
 	[-t=<template>] - use template <template> instead, implies '-a'
 
+	[-n=<jobs>] - use <jobs> number of fio jobs instead of 1
+
 EOUSAGE
 }
 
+njobs=1
+vsize=100G
 
 if [ -n "$*" ]; then
 	while test -n "$1"; do
@@ -34,6 +38,11 @@ if [ -n "$*" ]; then
 			-t=*)
 				template=${1##*=}
 				echo "using template $template"
+				shift
+				;;
+			-n=*)
+				njobs=${1##*=}
+				echo "number of jobs $njobs"
 				shift
 				;;
 			/dev/*)
@@ -86,9 +95,9 @@ if [[ -n "$autof" ]]; then
 	tname="test$$"
 	tvolume="/dev/storpool/$tname"
 	if [[ -z $template ]]; then
-		storpool volume "$tname" size 100G replication 3 placeAll hdd placeTail ssd
+		storpool volume "$tname" size $vsize replication 3 placeAll hdd placeTail ssd
 	else
-		storpool volume "$tname" size 100G template "$template"
+		storpool volume "$tname" size $vsize template "$template"
 	fi
 	storpool attach volume "$tname" here
 fi
@@ -103,9 +112,13 @@ chkdepend
 echo Regenerating templates
 	cd template
 	./rm_templates
-	./gen.pl
+	./gen.pl $njobs
 	cd ..
-	tests=( $(cat ./tests ) )
+	if [ -f ./tests.$njobs ]; then
+		tests=( $(cat ./tests.$njobs ) )
+	else
+		tests=( $(cat ./tests.4 ) )
+	fi
 
 echo Cleaning results directory
 	./rm_res
@@ -117,7 +130,7 @@ unset SP_FIO_DETECT_PRINT
 
 echo Running tests...
 	for test in ${tests[*]}; do
-		./run_one "$test" "$tvolume"
+		./run_one "$test" "$tvolume" "$vsize" "$njobs"
 	done
 
 echo Displaying and saving result...

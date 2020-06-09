@@ -10,7 +10,7 @@ my @conf = (
 	{
 		type => 'rand',
 		flavor => 'normal',
-		qd => [qw( 4 16 64 256 512 1024 )],
+		qd => [qw( 4 16 64 96 128 160 256 512 1024 )],
 		bs => [qw( 4k 8k 32k )],
 		rw =>      [qw( randread randwrite randrw )],
 		dir =>     [qw( r        w         rw     )],
@@ -47,6 +47,14 @@ my @conf = (
 );
 
 my @variants = ();
+
+my ($jobs) = @ARGV;
+
+if (not defined $jobs) {
+       my $jobs = 1;
+}
+
+
 
 for my $t ( @conf ) {
 for my $qd ( @{$t->{qd}} ) {
@@ -109,6 +117,7 @@ gtod_reduce=1
 time_based
 ".
 ( ($type eq 'lat' or $type eq 'rand' ) ? "norandommap\nrandrepeat=0\n" : "" ).
+( ($type eq 'rand' ) ? "numjobs=$jobs\ngroup_reporting" : "" ).
 "
 
 rw=$rw

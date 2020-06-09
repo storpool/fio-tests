@@ -4,12 +4,17 @@ set -e
 #set -x
 
 # check params
-if [ ! -f "template/$1" -o -z "$2" ]; then
-    echo "usage: $0 fio_job_template file" 1>&2
+if [ ! -f "template/$1" -o -z "$3" ]; then
+    echo "usage: $0 fio_job_template file size [numjobs]" 1>&2
     exit
 fi
 
 size="$3"
+njobs=1
+
+if [ -n "$4" ]; then
+	njobs=$4
+fi
 
 # examine the fio tool
 unset SP_FIO_DETECT_PRINT
@@ -28,11 +33,15 @@ fi
 # 0-7 -> 7
 # 0-1,4-6,22 -> 22
 # 3,7 -> 7
-cpu="$(taskset -c -p "$$" | sed -e 's/.*[,-]//')"
 
 # run test
 echo Running test $1
 mkdir -p res
 cat /proc/stat >res/$1.cpu.pre
-taskset -c $cpu fio $SP_FIO_PARAMS conf/$1 >res/$1.fio.$SP_FIO_EXT 2>res/$1.fio.err
+if [ $njobs -eq 1 ]; then
+	cpu="$(taskset -c -p "$$" | sed -e 's/.*[,-]//')"
+	taskset -c $cpu fio $SP_FIO_PARAMS conf/$1 >res/$1.fio.$SP_FIO_EXT 2>res/$1.fio.err
+else
+	fio $SP_FIO_PARAMS conf/$1 >res/$1.fio.$SP_FIO_EXT 2>res/$1.fio.err
+fi
 cat /proc/stat >res/$1.cpu.post
