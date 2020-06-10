@@ -3,8 +3,9 @@ set -e
 
 usage(){
 	cat <<EOUSAGE
-	Usage: $(basename -- $0) [-a] [-t=<template>] [-h|--help]
-	Usage: $(basename -- $0) <block_device>
+	Usage: $(basename -- $0) [-n=<jobs>] [-a] [-t=<template>] [-h|--help]
+	Usage: $(basename -- $0) [-n=<jobs>] -f=<file>
+	Usage: $(basename -- $0) [-n=<jobs>] <block_device>
 
 	Installs perl and fio dependencies, then runs a set of tests on <block_device>
 	Check the ./template directory for more fio example tests.
@@ -22,7 +23,8 @@ EOUSAGE
 }
 
 njobs=1
-vsize=100G
+vsize=1G
+file=no
 
 if [ -n "$*" ]; then
 	while test -n "$1"; do
@@ -45,6 +47,13 @@ if [ -n "$*" ]; then
 				echo "number of jobs $njobs"
 				shift
 				;;
+			-f=*)
+				tvolume=${1##*=}
+				file=yes
+				echo "Using file $tvolume"
+				shift
+				;;
+
 			/dev/*)
 				tvolume="$1"
 				shift
@@ -102,7 +111,7 @@ if [[ -n "$autof" ]]; then
 	storpool attach volume "$tname" here
 fi
 
-if [[ ! -b $tvolume ]]; then
+if [[ ! -b $tvolume ]] && [[ $file == no ]]; then
 	echo "$tvolume is not a block device, exiting"
 	exit 1
 fi
