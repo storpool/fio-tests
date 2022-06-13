@@ -23,7 +23,7 @@ EOUSAGE
 }
 
 njobs=1
-vsize=1G
+vsize=100G
 file=no
 
 if [ -n "$*" ]; then
