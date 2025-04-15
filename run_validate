@@ -9,9 +9,9 @@ usage(){
 	Used for validation of SSDs, runs the following set of tests:
 	 - pre-fill the device sequentially with random data.
 	 - run a set of tests:
-	  - latency - 4k/8k random read / random write single queue depth
-		- sequential - 1M read/write queue depth of 32
-		- random - 4k/8k read/write/mixed (50/50) queue depth of 32
+	 - latency - 4k/8k random read / random write single queue depth
+	 - sequential - 1M read/write queue depth of 32
+	 - random - 4k/8k read/write/mixed (50/50) queue depth of 32
 
 	Installs perl and fio dependencies if needed.
 
@@ -19,7 +19,6 @@ usage(){
 
 EOUSAGE
 }
-
 
 if [ -n "$*" ]; then
 	while test -n "$1"; do
@@ -96,16 +95,17 @@ chkdepend
 echo Regenerating templates
 	cd template
 	./rm_templates
-	./gen.pl
+	./gen.pl 32
 	cd ..
-	tests=( fill fill fill lat-{r,w}-{4,8}k-1 rand-{r,rw,w}-{4,8}k-64 seq-{r,w}-1M-64 sustain )
+	tests=( lat-{r,w}-{4,8,32,128}k-1 rand-{r,rw,w}-{4,8}k-64 seq-{r,w}-1M-64 sustain )
 
 echo Cleaning results directory
 	./rm_res
 
 echo Running tests...
 	for test in ${tests[*]}; do
-		./run_one "$test" "$tvolume"
+		device_size=$(cat "/sys/class/block/$(basename $tvolume)/size")
+		./run_one "$test" "$tvolume" "$device_size"
 		sleep 60
 	done
 
