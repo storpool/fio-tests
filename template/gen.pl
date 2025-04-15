@@ -10,11 +10,11 @@ my @conf = (
 	{
 		type => 'rand',
 		flavor => 'normal',
-		qd => [qw( 4 16 64 96 128 160 256 512 1024 )],
+		qd => [qw( 4 16 64 256 512 1024 )],
 		bs => [qw( 4k 8k 32k )],
 		rw =>      [qw( randread randwrite randrw )],
 		dir =>     [qw( r        w         rw     )],
-		runtime => [qw( 1m      1m        1m     )]
+		runtime => [qw( 1m       1m        1m     )]
 	},
 	{
 		type => 'seq',
@@ -23,38 +23,30 @@ my @conf = (
 		bs => [qw( 128k 1M )],
 		rw =>      [qw( read write  )],
 		dir =>     [qw( r        w  )],
-		runtime => [qw( 1m      1m )]
+		runtime => [qw( 1m       1m )]
 	},
 	{
 		type => 'lat',
 		flavor => 'normal',
 		qd => [qw( 1 2 4 8 16 32 64 128 256 512 1024 2048 )],
-		bs => [qw(4k 8k 32k)],
+		bs => [qw(4k 8k 32k 128k)],
 		rw =>      [qw( randread randwrite )],
 		dir =>     [qw( r        w         )],
-		runtime => [qw( 10s      1m        )],
+		runtime => [qw( 1m       1m        )],
 	},
 	{
 		type => 'latpio',
 		flavor => 'iops',
 		qd => [qw( 64 )],
-		bs => [qw(4k 8k 32k)],
+		bs => [qw(4k 8k 32k 128k)],
 		rw => 		 [qw( randread	randwrite   )],
 		dir =>	     [qw( r			w		    )],
-		runtime =>   [qw( 10s		1m			)],
+		runtime =>   [qw( 1m		1m			)],
 		rate_iops => [qw( 5000 10000 15000 20000 25000 30000 35000 40000 45000 50000 55000 60000 65000 70000 75000 80000 85000 90000 95000 100000 )],
 	}
 );
 
 my @variants = ();
-
-my ($jobs) = @ARGV;
-
-if (not defined $jobs) {
-       my $jobs = 1;
-}
-
-
 
 for my $t ( @conf ) {
 for my $qd ( @{$t->{qd}} ) {
@@ -112,12 +104,9 @@ sub gen_normal($)
 ioengine=libaio
 direct=1
 sync=0
-clocksource=cpu
-gtod_reduce=1
 time_based
 ".
 ( ($type eq 'lat' or $type eq 'rand' ) ? "norandommap\nrandrepeat=0\n" : "" ).
-( ($type eq 'rand' ) ? "numjobs=$jobs\ngroup_reporting" : "" ).
 "
 
 rw=$rw
