@@ -56,11 +56,10 @@ chkdepend(){
 	if [[ ! -e $fio ]]; then
 		echo "Attempting to installing fio,perl dependencies"
 		if type -f yum 2>/dev/null; then
-			yum -y install epel-release perl-core
-			yum -y install fio
+			yum -y install epel-release
+			yum -y install --enablerepo=epel fio perl-autodie perl-Data-Dumper perl-JSON-XS
 		elif type -f apt-get 2>/dev/null; then
-			apt-get --yes install perl libdata-dump-perl
-		  apt-get --yes install fio
+			apt-get --yes install fio libjson-xs-perl
 		else
 			echo 'Neither apt-get, nor yum found, OS not supported?'
 			exit 1
@@ -97,7 +96,7 @@ echo Regenerating templates
 	./rm_templates
 	./gen.pl 32
 	cd ..
-	tests=( lat-{r,w}-{4,8,32,128}k-1 rand-{r,rw,w}-{4,8}k-64 seq-{r,w}-1M-64 sustain )
+	tests=( fill fill fill lat-{r,w}-{4,8,32,128}k-1 rand-{r,rw,w}-{4,8}k-64 seq-{r,w}-1M-64 sustain )
 
 echo Cleaning results directory
 	./rm_res
